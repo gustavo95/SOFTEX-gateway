@@ -18,12 +18,14 @@
 #define BAND 915E6 //Frequência do radio - exemplo : 433E6, 868E6, 915E6
 
 //Wifi credentials
-// const char* ssid = "Quiteria";
-// const char* password = "Quiteria19051403@";
 // const char* ssid = "IC-ALUNOS";
 // const char* password = "icomputacaoufal";
-const char* ssid = "Igor_1";
-const char* password = "nlw3904nly9968";
+// const char* ssid = "Igor_1";
+// const char* password = "nlw3904nly9968";
+// const char* ssid = "CLARO_2G913C4E";
+// const char* password = "12913C4E";
+const char* ssid = "TP-Link_D636";
+const char* password = "25973662";
 
 //Solaire access
 HTTPClient http;
@@ -39,8 +41,8 @@ const String sl_password = "softexfotovoltaic123";
 String token = "";
 
 // Configuration for NTP
-const char* ntp_primary = "a.ntp.br";
-const char* ntp_secondary = "b.ntp.br";
+const char* ntp_primary = "a.st1.ntp.br";
+const char* ntp_secondary = "b.st1.ntp.br";
  
 //Objects declaration
 SSD1306 display(0x3c, 4, 15);
@@ -98,15 +100,20 @@ void setupLoRa(){
 }
 
 void setupWifi(){
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect();
+  delay(100);
   WiFi.begin(ssid, password);
-  Serial.println("Connecting WiFi");
+  Serial.println("Connecting Wi-Fi");
   int count = 0;
   while(WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
     count++;
-    if(count > 50){
-      Serial.println("\nUnable to connect WiFi\nResting ESP\n");
+    if(count > 60){
+      Serial.print("\nUnable to connect WiFi. Erro code: ");
+      Serial.println(WiFi.status());
+      Serial.println("Reseting ESP\n");
       esp_restart();
     }
   }
@@ -143,6 +150,7 @@ void IRAM_ATTR resetModule(){
 
 void setup(){
   Serial.begin(115200);
+  delay(200);
 
   //Config watchdog 2 min and 30 sec
   timer = timerBegin(0, 80, true);
@@ -163,42 +171,44 @@ void setup(){
   display.setTextAlignment(TEXT_ALIGN_LEFT);
 
   display.clear();
-  display.drawString(0, 0, "Iniciando Gateway");
+  display.drawString(0, 0, "Initializing gateway");
   display.display();
-  Serial.println("Iniciando Gateway");
+  Serial.println("\n");
+  Serial.println("Initializing gateway");
 
   //Chama a configuração inicial do LoRa
   setupLoRa();
   display.clear();
-  display.drawString(0, 0, "LoRa configurado");
+  display.drawString(0, 0, "LoRa ready");
   display.display();
-  Serial.println("LoRa configurado");
+  Serial.println("LoRa ready");
 
   setupWifi();
   delay(1000);
   display.clear();
-  display.drawString(0, 0, "WiFi configurado");
+  display.drawString(0, 0, "WiFi ready");
   display.display();
-  Serial.println("WiFi configurado");
+  Serial.println("WiFi read");
 
+  Serial.println("Synchronizing time");
   configTime(0, 0, ntp_primary, ntp_secondary);
   while (time(nullptr) < 1510644967) {
-    delay(10);
+    delay(1000);
   }
   Serial.println("Time synced");
 
-  getToken();
-  display.clear();
-  display.drawString(0, 0, "CloudIoT initialized");
-  display.display();
-  Serial.println("CloudIoT initialized");
+  // getToken();
+  // display.clear();
+  // display.drawString(0, 0, "CloudIoT initialized");
+  // display.display();
+  // Serial.println("CloudIoT initialized");
 
   delay(1000);
 
   display.clear();
-  display.drawString(0, 0, "Gateway esperando...");
+  display.drawString(0, 0, "Gateway waiting...");
   display.display();
-  Serial.println("Gateway esperando...");
+  Serial.println("Gateway waiting...");
 }
 
 void sendACK(uint8_t to){
@@ -252,31 +262,31 @@ void sendACK(uint8_t to){
 
 void readStationData(char* received){
   DateTime now = decoder.getDate(received[1], received[2], received[3], received[4]);
-  float temp = decoder.getTemp(received[5], received[6]);
-  int humi = decoder.getHumi(received[7]);
-  float irrad = decoder.getIrrad(received[8], received[9]);
-  float windSpeed = decoder.getWindSpeed(received[10]);
-  int windDirection = decoder.getWindDirection(received[11]);
-  float rain = decoder.getRain(received[12]);
-  float pvtemp = decoder.getTemp(received[13], received[14]);
-  float voltage = decoder.getVoltage(received[15], received[16]);
-  float current = decoder.getCurrent(received[17]);
+  // float temp = decoder.getTemp(received[5], received[6]);
+  // int humi = decoder.getHumi(received[7]);
+  // float irrad = decoder.getIrrad(received[8], received[9]);
+  // float windSpeed = decoder.getWindSpeed(received[10]);
+  // int windDirection = decoder.getWindDirection(received[11]);
+  // float rain = decoder.getRain(received[12]);
+  float pvtemp = decoder.getTemp(received[5], received[6]);
+  float voltage = decoder.getVoltage(received[7], received[8]);
+  float current = decoder.getCurrent(received[9]);
 
   Serial.println(String(now.year())+"-"+String(now.month())+"-"+String(now.day())+"T"+String(now.hour())+":"+String(now.minute())+":"+String(now.second())+".000000-03:00\"");
-  Serial.println(temp);
+  // Serial.println(temp);
   // Serial.println(humi);
-  Serial.println(irrad);
+  // Serial.println(irrad);
   // Serial.println(windSpeed);
   // Serial.println(windDirection);
   // Serial.println(rain);
   Serial.println(pvtemp);
-  // Serial.println(voltage);
-  // Serial.println(current);
+  Serial.println(voltage);
+  Serial.println(current);
 
   if(lastStationData != now.unixtime()){
-    irradiance = irrad;
+    // irradiance = irrad;
     pvTemperature = pvtemp;
-    ambTemperature = temp;
+    // ambTemperature = temp;
 
     stationDataRedy = 1;
     ackSentStation = 0;
@@ -369,6 +379,7 @@ void sendData(){
   DateTime now = stationTime;
   String timestamp = String(now.year())+"-"+String(now.month())+"-"+String(now.day())+"T"+String(now.hour())+":"+String(now.minute())+":"+String(now.second())+".000000-03:00\"";
 
+  // Dados fake
   float power = 5000 * (irradiance/1000) * (1 - 0.0045*(pvTemperature - 25)) * 0.90;
   float voltage1 = 301 * (1 - 0.0035*(pvTemperature - 25));
   float voltage2 = 270 * (1 - 0.0035*(pvTemperature - 25));
@@ -452,7 +463,9 @@ void loop(){
 
   if(stationDataRedy && dlDataReady){
     Serial.println("-------------------------------------------");
-    sendData();
+    // sendData();
+    stationDataRedy = 0;
+    dlDataReady = 1;
     timerWrite(timer, 0);
     Serial.println("-------------------------------------------\n");
   }
