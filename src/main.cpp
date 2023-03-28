@@ -63,9 +63,17 @@ int ackSentDL = 0;
 //Data to send
 DateTime stationTime = time(NULL)-10800;
 DateTime dlTime = time(NULL)-10800;
-float irradiance = 0;
-float pvTemperature = 0;
+
 float ambTemperature = 0;
+int humidity = 0;
+float irradiance = 0;
+float windSpeed = 0;
+int windDirection = 0;
+float accumulatedRain = 0;
+float pvTemperature = 0;
+float openCircuitVoltage = 0;
+float shortCircuitCurrent = 0;
+
 float powerAvg = 0;
 float voltageS1 = 0;
 float currentS1 = 0;
@@ -262,31 +270,37 @@ void sendACK(uint8_t to){
 
 void readStationData(char* received){
   DateTime now = decoder.getDate(received[1], received[2], received[3], received[4]);
-  // float temp = decoder.getTemp(received[5], received[6]);
-  // int humi = decoder.getHumi(received[7]);
-  // float irrad = decoder.getIrrad(received[8], received[9]);
-  // float windSpeed = decoder.getWindSpeed(received[10]);
-  // int windDirection = decoder.getWindDirection(received[11]);
-  // float rain = decoder.getRain(received[12]);
-  float pvtemp = decoder.getTemp(received[5], received[6]);
-  float voltage = decoder.getVoltage(received[7], received[8]);
-  float current = decoder.getCurrent(received[9]);
+  float temp = decoder.getTemp(received[5], received[6]);
+  int humi = decoder.getHumi(received[7]);
+  float irrad = decoder.getIrrad(received[8], received[9]);
+  float wSpeed = decoder.getWindSpeed(received[10]);
+  int wDirection = decoder.getWindDirection(received[11]);
+  float rain = decoder.getRain(received[12]);
+  float pvtemp = decoder.getTemp(received[13], received[14]);
+  float voltage = decoder.getVoltage(received[15], received[16]);
+  float current = decoder.getCurrent(received[17]);
 
   Serial.println(String(now.year())+"-"+String(now.month())+"-"+String(now.day())+"T"+String(now.hour())+":"+String(now.minute())+":"+String(now.second())+".000000-03:00\"");
-  // Serial.println(temp);
-  // Serial.println(humi);
-  // Serial.println(irrad);
-  // Serial.println(windSpeed);
-  // Serial.println(windDirection);
-  // Serial.println(rain);
+  Serial.println(temp);
+  Serial.println(humi);
+  Serial.println(irrad);
+  Serial.println(wSpeed);
+  Serial.println(wDirection);
+  Serial.println(rain);
   Serial.println(pvtemp);
   Serial.println(voltage);
   Serial.println(current);
 
-  if(lastStationData != now.unixtime()){
-    // irradiance = irrad;
+  if(lastStationData != now.unixtime()) {
+    ambTemperature = temp;
+    humidity = humi;
+    irradiance = irrad;
+    windSpeed = wSpeed;
+    windDirection = wDirection;
+    accumulatedRain = rain;
     pvTemperature = pvtemp;
-    // ambTemperature = temp;
+    openCircuitVoltage = voltage;
+    shortCircuitCurrent = current;
 
     stationDataRedy = 1;
     ackSentStation = 0;
@@ -301,8 +315,8 @@ void readStationData(char* received){
     lastStationData = now.unixtime();
     stationTime = now;
   }
-  else{
-    if(ackSentStation > 5){
+  else {
+    if(ackSentStation > 5) {
       esp_restart();
     }
     setupLoRa();
@@ -311,20 +325,22 @@ void readStationData(char* received){
   }
 }
 
-void readDataLoggerData(char* received){
+void readDataLoggerData(char* received) {
   DateTime now = decoder.getDate(received[1], received[2], received[3], received[4]);
   float data[48];
   int k_data = 0;
   int k_byte = 5;
   for(int i = 0; i < 6; i++){
     for(int j = 0; j < 8; j++){
-      if((i < 2) || ((i == 2) && (j<4))){
+      if((i < 2) || ((i == 2) && (j<4))) {
         data[k_data] = decoder.getCurrent(received[k_byte]);
         k_byte++;
-      }else if(i < 5){
+      }
+      else if(i < 5) {
         data[k_data] = decoder.getVoltage(received[k_byte], received[k_byte+1]);
         k_byte = k_byte + 2; 
-      }else{
+      }
+      else {
         data[k_data] = decoder.getPower(received[k_byte], received[k_byte+1], received[k_byte+2]);
         k_byte = k_byte + 3;
       }
@@ -339,7 +355,7 @@ void readDataLoggerData(char* received){
   Serial.println(data[21]);
   Serial.println(data[40]);
 
-  if(lastDLData != now.unixtime()){
+  if(lastDLData != now.unixtime()) {
     currentS1 = data[0]; //ADC0, porta 0
     currentS2 = data[1]; //ADC0, porta 1
     voltageS1 = data[20]; //ADC2, porta 4
@@ -359,8 +375,8 @@ void readDataLoggerData(char* received){
     lastDLData = now.unixtime();
     dlTime = now;
   }
-  else{
-    if(ackSentDL > 5){
+  else {
+    if(ackSentDL > 5) {
       esp_restart();
     }
     setupLoRa();
@@ -369,7 +385,7 @@ void readDataLoggerData(char* received){
   }
 }
 
-void sendData(){
+void sendData() {
   Serial.println("Sending data");
   
   http.begin((url + "api/external/postdata/").c_str());
@@ -423,21 +439,21 @@ void sendData(){
   }
 }
 
-void loop(){
+void loop() {
   int packetSize = LoRa.parsePacket();
  
-  if (packetSize > 0){
+  if (packetSize > 0) {
     char received[packetSize];
     int cursor = 0;
  
-    while(LoRa.available()){
+    while(LoRa.available()) {
       received[cursor] = (char) LoRa.read();
       cursor++;
     }
 
-    if(decoder.getTo(received[0]) == GATEWAY){
+    if(decoder.getTo(received[0]) == GATEWAY) {
       timerWrite(timer, 0);
-      if(decoder.getFrom(received[0]) == STATION){
+      if(decoder.getFrom(received[0]) == STATION) {
         digitalWrite(25, HIGH);   // indicative LED
 
         Serial.println("-------------------------------------------");
@@ -448,7 +464,7 @@ void loop(){
         Serial.println("-------------------------------------------\n");
       }
 
-      if(decoder.getFrom(received[0]) == DATALOGGER){
+      if(decoder.getFrom(received[0]) == DATALOGGER) {
         digitalWrite(25, HIGH);   // indicative LED
 
         Serial.println("-------------------------------------------");
@@ -461,7 +477,7 @@ void loop(){
     }
   }
 
-  if(stationDataRedy && dlDataReady){
+  if(stationDataRedy && dlDataReady) {
     Serial.println("-------------------------------------------");
     // sendData();
     stationDataRedy = 0;
