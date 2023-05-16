@@ -30,13 +30,13 @@ const char* password = "25973662";
 //Solaire access
 HTTPClient http;
 
-const String url = "http://34.151.229.173:8000/";
-const String username = "softex";
-const String sl_password = "softexfotovoltaic123";
+// const String url = "http://34.151.229.173:8000/";
+// const String username = "softex";
+// const String sl_password = "softexfotovoltaic123";
 
-// const String url = "http://192.168.0.19:8000/";
-// const String username = "admin";
-// const String sl_password = "admin";
+const String url = "http://192.168.1.101:8000/";
+const String username = "admin";
+const String sl_password = "admin";
 
 String token = "";
 
@@ -55,8 +55,8 @@ int settingsStation = 0;
 int settingsDatalogger = 0;
 long lastStationData = 0;
 long lastDLData = 0;
-int stationDataRedy = 0;
-int dlDataReady = 1;
+int stationDataRedy = 1;
+int dlDataReady = 0;
 int ackSentStation = 0;
 int ackSentDL = 0;
 
@@ -356,10 +356,10 @@ void readDataLoggerData(char* received) {
   Serial.println(data[40]);
 
   if(lastDLData != now.unixtime()) {
-    currentS1 = data[0]; //ADC0, porta 0
-    currentS2 = data[1]; //ADC0, porta 1
-    voltageS1 = data[20]; //ADC2, porta 4
-    voltageS2 = data[21]; //ADC2, porta 5
+    // currentS1 = data[0]; //ADC0, porta 0
+    // currentS2 = data[1]; //ADC0, porta 1
+    // voltageS1 = data[20]; //ADC2, porta 4
+    // voltageS2 = data[21]; //ADC2, porta 5
     powerAvg = data[40]; //ADC5, porta 0 
 
     dlDataReady = 1;
@@ -396,28 +396,24 @@ void sendData() {
   String timestamp = String(now.year())+"-"+String(now.month())+"-"+String(now.day())+"T"+String(now.hour())+":"+String(now.minute())+":"+String(now.second())+".000000-03:00\"";
 
   // Dados fake
-  float power = 5000 * (irradiance/1000) * (1 - 0.0045*(pvTemperature - 25)) * 0.90;
-  float voltage1 = 301 * (1 - 0.0035*(pvTemperature - 25));
-  float voltage2 = 270 * (1 - 0.0035*(pvTemperature - 25));
-  float current = 6.97 * (irradiance/1000) * (1 + 0.0006*(pvTemperature - 25));
+  // float power = 5000 * (irradiance/1000) * (1 - 0.0045*(pvTemperature - 25)) * 0.90;
+  // float voltage1 = 301 * (1 - 0.0035*(pvTemperature - 25));
+  // float voltage2 = 270 * (1 - 0.0035*(pvTemperature - 25));
+  // float current = 6.97 * (irradiance/1000) * (1 + 0.0006*(pvTemperature - 25));
 
   String payload = String("{") +
     "\"timestamp\": \"" + timestamp +
     ",\"irradiance\": " + String(irradiance) +
     ",\"temperature_pv\": " + String(pvTemperature) +
     ",\"temperature_amb\": " + String(ambTemperature) +
-    ",\"power_avr\": " + String(power) +
-    ",\"generation\": null" +
-    ",\"strings\": [" +
-      "{\"voltage\": " + String(voltage1) +
-      ",\"current\": " + String(current) +
-      ", \"power\": " + String(voltage1*current) +
-      ",\"string_number\": 1}," +
-      "{\"voltage\": " + String(voltage2) +
-      ",\"current\": " + String(current) +
-      ", \"power\": " + String(voltage2*current) +
-      ",\"string_number\": 2}" +
-    "]}";
+    ",\"humidity\": " + String(humidity) +
+    ",\"wind_speed\": " + String(windSpeed) +
+    ",\"wind_direction\": " + String(windDirection) +
+    ",\"rain\": " + String(accumulatedRain) +
+    ",\"ocv\": " + String(openCircuitVoltage) +
+    ",\"scc\": " + String(shortCircuitCurrent) +
+    ",\"power_avr\": " + String(powerAvg) +
+    ",\"generation\": null}";
 
   int httpResponseCode = http.POST(payload);
   // int httpResponseCode = 200;
@@ -425,7 +421,7 @@ void sendData() {
   if (httpResponseCode==200) {
     Serial.print("HTTP Response code: ");
     stationDataRedy = 0;
-    dlDataReady = 1;
+    dlDataReady = 0;
 
     display.clear();
     display.drawString(0, 0, "Data sent: " + timestamp);
@@ -479,9 +475,9 @@ void loop() {
 
   if(stationDataRedy && dlDataReady) {
     Serial.println("-------------------------------------------");
-    // sendData();
-    stationDataRedy = 0;
-    dlDataReady = 1;
+    sendData();
+    // stationDataRedy = 1;
+    // dlDataReady = 0;
     timerWrite(timer, 0);
     Serial.println("-------------------------------------------\n");
   }
