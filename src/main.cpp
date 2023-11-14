@@ -1,3 +1,4 @@
+#include <Arduino.h>
 #include <SPI.h>
 #include <LoRa.h>
 #include <Wire.h>
@@ -24,8 +25,8 @@
 // const char* password = "nlw3904nly9968";
 // const char* ssid = "CLARO_2G913C4E";
 // const char* password = "12913C4E";
-const char* ssid = "TP-Link_D636";
-const char* password = "25973662";
+const char* ssid = "MiniusinaUFALiot";
+const char* password = "ufal25973662";
 
 //Solaire access
 HTTPClient http;
@@ -34,7 +35,7 @@ HTTPClient http;
 // const String username = "softex";
 // const String sl_password = "softexfotovoltaic123";
 
-const String url = "http://192.168.1.101:8000/";
+const String url = "http://192.168.1.100:8000/";
 const String username = "admin";
 const String sl_password = "admin";
 
@@ -55,7 +56,7 @@ int settingsStation = 0;
 int settingsDatalogger = 0;
 long lastStationData = 0;
 long lastDLData = 0;
-int stationDataRedy = 1;
+int stationDataRedy = 0;
 int dlDataReady = 0;
 int ackSentStation = 0;
 int ackSentDL = 0;
@@ -107,10 +108,62 @@ void setupLoRa(){
   LoRa.setSyncWord(0x12); // default: 0x12
 }
 
+void printEncryptionType(int thisType) {
+  // read the encryption type and print out the name:
+  switch (thisType) {
+    case 5:
+      Serial.println("WEP");
+      break;
+    case 2:
+      Serial.println("WPA");
+      break;
+    case 4:
+      Serial.println("WPA2");
+      break;
+    case 7:
+      Serial.println("None");
+      break;
+    case 8:
+      Serial.println("Auto");
+      break;
+    default:
+      Serial.println("Not supported");
+      break;
+  }
+}
+
+int listNetworks() {
+  // scan for nearby networks:
+  Serial.println("** Scan Networks **");
+  int numSsid = WiFi.scanNetworks();
+  if (numSsid < 0) {
+    Serial.println("Couldn't get a wifi connection");
+    return 0;
+  }
+
+  // print the list of networks seen:
+  Serial.print("number of available networks: ");
+  Serial.println(numSsid);
+
+  // print the network number and name for each network found:
+  for (int thisNet = 0; thisNet < numSsid; thisNet++) {
+    Serial.print(thisNet);
+    Serial.print(") ");
+    Serial.print(WiFi.SSID(thisNet));
+    Serial.print("\tSignal: ");
+    Serial.print(WiFi.RSSI(thisNet));
+    Serial.print(" dBm");
+    Serial.print("\tEncryption: ");
+    printEncryptionType(WiFi.encryptionType(thisNet));
+  }
+  return 1;
+}
+
 void setupWifi(){
   WiFi.mode(WIFI_STA);
   WiFi.disconnect();
   delay(100);
+  listNetworks();
   WiFi.begin(ssid, password);
   Serial.println("Connecting Wi-Fi");
   int count = 0;
@@ -118,7 +171,7 @@ void setupWifi(){
     delay(500);
     Serial.print(".");
     count++;
-    if(count > 60){
+    if(count > 120){
       Serial.print("\nUnable to connect WiFi. Erro code: ");
       Serial.println(WiFi.status());
       Serial.println("Reseting ESP\n");
@@ -412,7 +465,7 @@ void sendData() {
     ",\"rain\": " + String(accumulatedRain) +
     ",\"ocv\": " + String(openCircuitVoltage) +
     ",\"scc\": " + String(shortCircuitCurrent) +
-    ",\"power_avr\": " + String(powerAvg) +
+    ",\"power_avg\": " + String(powerAvg) +
     ",\"generation\": null}";
 
   int httpResponseCode = http.POST(payload);
@@ -476,7 +529,7 @@ void loop() {
   if(stationDataRedy && dlDataReady) {
     Serial.println("-------------------------------------------");
     sendData();
-    // stationDataRedy = 1;
+    // stationDataRedy = 0;
     // dlDataReady = 0;
     timerWrite(timer, 0);
     Serial.println("-------------------------------------------\n");
